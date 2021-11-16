@@ -106,6 +106,9 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
+	ldw t0, SCORE (zero)
+	stw 0xFC, SEVEN_SEGS(zero)
+	stw 0xFC, SEVEN_SEGS(4)
 
 ; END: display_score
 
@@ -163,14 +166,14 @@ hit_test:
 	beq t3, 4, abordGame
 
 
-	stw v0, 0 ; if no branch were called
+	stw 0,v0(zero) ; if no branch were called
 
 abordGame:
-	stw v0, 2
+	stw 2,v0(zero)
 	ret
 
 miamMiam:
-	stw v0, 1
+	stw 1,v0(zero)
 	ret
 
 
