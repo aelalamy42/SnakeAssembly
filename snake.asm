@@ -65,10 +65,11 @@ main:
 	addi t0, zero, DIR_RIGHT
 	stw t0, GSA (zero)
 	ml:
+	call draw_array
+	call wait
 	call clear_leds
 	call get_input
 	call move_snake
-	call draw_array
 	br ml
 	jmpi blink_score
 
@@ -106,9 +107,6 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
-	ldw t0, SCORE (zero)
-	stw 0xFC, SEVEN_SEGS(zero)
-	stw 0xFC, SEVEN_SEGS(4)
 
 ; END: display_score
 
@@ -121,8 +119,7 @@ init_game:
 
 ; BEGIN: create_food
 create_food:
-;	ldw t1, RANDOM_NUM (zero)
-	addi t1, zero, 95
+  	ldw t1, RANDOM_NUM (zero)
 	addi t0, zero, 255
 	and t1, t1, t0
 	slli t1, t1, 2
@@ -134,103 +131,12 @@ create_food:
 	addi t3, zero, FOOD
 	stw t3, 0(t2)
 	return:
-	ret
+	ret 
 ; END: create_food
 
 
 ; BEGIN: hit_test
 hit_test:
-	ldw t0, HEAD_X (zero)
-	ldw t1, HEAD_Y (zero)
-	addi sp, sp, -4
-	stw ra, 0 (sp)
-	call test_orientation
-	ldw ra, 0(sp)
-	addi sp, sp, 4
-	
-	bge t0, 12, abordGame
-	ble t0, -1, abordGame
-	bge t1, 8, abordGame
-	ble t1, -1,abordGame
-
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2 ;pos of future head in GSA
-	ldw t3, GSA(t2) ;value of future head in GSA (1 -> 5)
-
-	beq t3, 5, miamMiam
-	beq t3, 1, abordGame
-	beq t3, 2, abordGame
-	beq t3, 3, abordGame
-	beq t3, 4, abordGame
-
-
-	stw 0,v0(zero) ; if no branch were called
-
-abordGame:
-	stw 2,v0(zero)
-	ret
-
-miamMiam:
-	stw 1,v0(zero)
-	ret
-
-
-test_orientation:
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2 ;pos of extremity in GSA
-	ldw t3, GSA(t2) ;direction of extremity
-	beq zero, t5, next
-	stw zero, GSA(t2) ; clear the tail
-
-	next:
-	addi t6,zero,DIR_LEFT
-	beq t6,t3, goleft
-
-	addi t6,zero,DIR_UP
-	beq t6,t3, goup
-
-	addi t6,zero, DIR_DOWN
-	beq t6,t3, godown
-
-	addi t6,zero, DIR_RIGHT
-	beq t6,t3, goright
-
-goleft:
-	addi t0,t0,-1
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
-	ret
-goup:
-	addi t1,t1,-1
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
-	ret
-godown:
-	addi t1,t1,1 
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
-	ret
-goright:
-	addi t0,t0,1
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
-	ret
 
 ; END: hit_test
 
@@ -245,6 +151,7 @@ get_input:
 	ldw t3, HEAD_Y (zero)
 	slli t2, t2, 3
 	add t2, t2, t3 ;pos of head in GSA
+	slli t2, t2 , 2
 	ldw t3, GSA (t2)
 	beq t1, zero, end
 	addi t5, zero, 16
@@ -411,9 +318,9 @@ restore_checkpoint:
 
 ;BEGIN: wait
 wait:
-	addi t1, zero, 488
+	addi t1, zero, 7808
 	slli t1, t1, 9
-	addi t1, t1, 144
+	addi t1, t1, 2304
 	waiting_loop:
 		addi t1, t1, -1
 		bne t1, zero, waiting_loop
@@ -422,5 +329,23 @@ wait:
 
 ; BEGIN: blink_score
 blink_score:
+	addi sp, sp, -4
+	stw ra, 0 (sp)
+	add t2, zero, zero
+	addi t3, zero, 3	
+	multiple_loop:
+	add t0, zero, zero
+	addi t1, zero, 4
+	clear_7_segs:
+		stw zero, SEVEN_SEGS (t0)
+		addi t0, t0, 1
+		bne t0, t1, clear_7_segs
+	call wait
+	call display_score
+	addi t2, t2, 1
+	bne t2, t3, multiple_loop
+	ldw ra, 0 (sp)
+	addi sp, sp, 4
+	ret
 
 ; END: blink_score
