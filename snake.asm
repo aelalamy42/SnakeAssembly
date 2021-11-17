@@ -107,6 +107,10 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
+display_score:
+	ldw t0, SCORE (zero)
+	stw 0xFC, SEVEN_SEGS(zero)
+	stw 0xFC, SEVEN_SEGS(4)
 
 ; END: display_score
 
@@ -137,7 +141,97 @@ create_food:
 
 ; BEGIN: hit_test
 hit_test:
+	ldw t0, HEAD_X (zero)
+	ldw t1, HEAD_Y (zero)
+	addi sp, sp, -4
+	stw ra, 0 (sp)
+	call test_orientation
+	ldw ra, 0(sp)
+	addi sp, sp, 4
 
+	bge t0, 12, abordGame
+	ble t0, -1, abordGame
+	bge t1, 8, abordGame
+	ble t1, -1,abordGame
+
+	addi t2, zero, 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2 ;pos of future head in GSA
+	ldw t3, GSA(t2) ;value of future head in GSA (1 -> 5)
+
+	beq t3, 5, miamMiam
+	beq t3, 1, abordGame
+	beq t3, 2, abordGame
+	beq t3, 3, abordGame
+	beq t3, 4, abordGame
+
+
+	stw v0, 0 ; if no branch were called
+
+abordGame:
+	stw v0, 2
+	ret
+
+miamMiam:
+	stw v0, 1
+	ret
+
+
+test_orientation:
+	addi t2, zero, 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2 ;pos of extremity in GSA
+	ldw t3, GSA(t2) ;direction of extremity
+	beq zero, t5, next
+	stw zero, GSA(t2) ; clear the tail
+
+	next:
+	addi t6,zero,DIR_LEFT
+	beq t6,t3, goleft
+
+	addi t6,zero,DIR_UP
+	beq t6,t3, goup
+
+	addi t6,zero, DIR_DOWN
+	beq t6,t3, godown
+
+	addi t6,zero, DIR_RIGHT
+	beq t6,t3, goright
+
+goleft:
+	addi t0,t0,-1
+	addi t2, zero, 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	stw t6, GSA(t2)
+	ret
+goup:
+	addi t1,t1,-1
+	addi t2, zero, 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	stw t6, GSA(t2)
+	ret
+godown:
+	addi t1,t1,1 
+	addi t2, zero, 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	stw t6, GSA(t2)
+	ret
+goright:
+	addi t0,t0,1
+	addi t2, zero, 0
+	slli t2, t0, 3
+	add t2, t2, t1
+	slli t2, t2, 2
+	stw t6, GSA(t2)
+	ret
 ; END: hit_test
 
 
