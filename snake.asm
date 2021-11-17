@@ -43,6 +43,17 @@
 .equ    ARG_HUNGRY,     0       ; a0 argument for move_snake when food wasn't eaten
 .equ    ARG_FED,        1       ; a0 argument for move_snake when food was eaten
 
+digit_map:
+	.word 0xFC ; 0
+	.word 0x60 ; 1
+	.word 0xDA ; 2
+	.word 0xF2 ; 3
+	.word 0x66 ; 4
+	.word 0xB6 ; 5
+	.word 0xBE ; 6
+	.word 0xE0 ; 7
+	.word 0xFE ; 8
+	.word 0xF6 ; 9
 
 ; initialize stack pointer
 addi    sp, zero, LEDS
@@ -107,16 +118,63 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
-display_score:
 	ldw t0, SCORE (zero)
-	stw 0xFC, SEVEN_SEGS(zero)
-	stw 0xFC, SEVEN_SEGS(4)
+
+	stw zero,t1
+	addi t5,zero,1000
+	stw t5,t2
+	bge t0,t2, myLoop
+	ldw t3, digit_map(t1)
+	stw t3, SEVEN_SEGS(zero)
+
+	stw zero,t1
+	addi t5,zero,100
+	stw t5,t2
+	bge t0,t2, myLoop
+	ldw t3, digit_map(t1)
+	stw t3, SEVEN_SEGS(4)
+
+	stw zero,t1
+	addi t5,zero,10
+	stw t5,t2
+	bge t0,t2, myLoop
+	ldw t3, digit_map(t1)
+	stw t3, SEVEN_SEGS(8)
+
+	ldw t3, digit_map(t0)
+	stw t3, SEVEN_SEGS(12)
+
+myLoop:
+	addi t0, t0, -t2
+	addi t1, t1, 1
+	bge t0,t2, myLoop
+
 
 ; END: display_score
 
 
 ; BEGIN: init_game
 init_game:
+	addi t0, zero, 1
+	stw t0, HEAD_X(zero)
+	stw t0, HEAD_Y(zero)
+	stw t0, TAIL_X(zero)
+	stw t0, TAIL_Y(zero)
+	
+	ldw t1, SCORE(zero)
+	ldw t2, SEVEN_SEGS(zero)
+	blt t1,t2,yeahLoop
+
+	addi t0, zero, 4
+	stw t0, GSA(zero)
+	call create_food
+	call display_score
+
+yeahLoop:
+	stw zero,t1
+	addi t1,t1,1
+	blt t1,t2,yeahLoop
+
 
 ; END: init_game
 
@@ -258,41 +316,39 @@ get_input:
 	beq t1, t5, up
 	srli t5, t5, 1	
 	beq t1, t5, left
-	
 
-	
-	left:
-		addi t5, zero, DIR_RIGHT
-		addi t0, t0, BUTTON_LEFT
-		beq t3, t5, end
-		addi t3, zero, DIR_LEFT
-		br end
-	right:
-		addi t5, zero, DIR_LEFT
-		addi t0, t0, BUTTON_RIGHT
-		beq t3, t5, end
-		addi t3, zero, DIR_RIGHT
-		br end
-	up:
-		addi t5, zero, DIR_DOWN
-		addi t0, t0, BUTTON_UP
-		beq t3, t5, end
-		addi t3, zero, DIR_UP
-		br end
-	down:
-		addi t5, zero, DIR_UP
-		addi t0, t0, BUTTON_DOWN
-		beq t3, t5, end
-		addi t3, zero, DIR_DOWN
-		br end
-	checkpoint:
-		addi t0, t0, BUTTON_CHECKPOINT
-		br end
-	end:
-		stw t3, GSA (t2)
-		stw zero, BUTTONS+4 (zero)
-		add v0, zero, t0
-		ret
+left:
+	addi t5, zero, DIR_RIGHT
+	addi t0, t0, BUTTON_LEFT
+	beq t3, t5, end
+	addi t3, zero, DIR_LEFT
+	br end
+right:
+	addi t5, zero, DIR_LEFT
+	addi t0, t0, BUTTON_RIGHT
+	beq t3, t5, end
+	addi t3, zero, DIR_RIGHT
+	br end
+up:
+	addi t5, zero, DIR_DOWN
+	addi t0, t0, BUTTON_UP
+	beq t3, t5, end
+	addi t3, zero, DIR_UP
+	br end
+down:
+	addi t5, zero, DIR_UP
+	addi t0, t0, BUTTON_DOWN
+	beq t3, t5, end
+	addi t3, zero, DIR_DOWN
+	br end
+checkpoint:
+	addi t0, t0, BUTTON_CHECKPOINT
+	br end
+end:
+	stw t3, GSA (t2)
+	stw zero, BUTTONS+4 (zero)
+	add v0, zero, t0
+	ret
 
 ; END: get_input
 
