@@ -43,18 +43,6 @@
 .equ    ARG_HUNGRY,     0       ; a0 argument for move_snake when food wasn't eaten
 .equ    ARG_FED,        1       ; a0 argument for move_snake when food was eaten
 
-digit_map:
-	.word 0xFC ; 0
-	.word 0x60 ; 1
-	.word 0xDA ; 2
-	.word 0xF2 ; 3
-	.word 0x66 ; 4
-	.word 0xB6 ; 5
-	.word 0xBE ; 6
-	.word 0xE0 ; 7
-	.word 0xFE ; 8
-	.word 0xF6 ; 9
-
 ; initialize stack pointer
 addi    sp, zero, LEDS
 
@@ -72,17 +60,43 @@ main:
 	;call set_pixel
 	;jmpi blink_score
 
+;	addi t0, zero, 4
+	;stw t0, GSA+260(zero)
+;	call clear_leds
+;	call create_food
+;	call draw_array
+
+;	addi t1, zero, 1234
+;	stw t1, SCORE(zero)
+;	call blink_score
+;	break
 
 	addi t0, zero, DIR_RIGHT
 	stw t0, GSA (zero)
+	call create_food
 	ml:
 	call draw_array
 	call wait
 	call clear_leds
 	call get_input
+	call hit_test
+	addi t0, zero, 0
+	beq t0, v0, continue
+	addi t0, zero, 1
+	beq t0, v0, f
+	addi t0, zero, 2
+	beq t0, v0, stop
+	f:
+	call create_food
+	addi a0, zero, 1
 	call move_snake
 	br ml
-	jmpi blink_score
+	continue:
+	add a0, zero, zero
+	call move_snake
+	br ml
+	stop:
+	break
 
 ; BEGIN: clear_leds
 clear_leds:
@@ -120,79 +134,70 @@ set_pixel:
 display_score:
 	ldw t0, SCORE (zero)
 
-	stw zero,t1
+	add t1, zero, zero
 	addi t5,zero,1000
-	stw t5,t2
-	bge t0,t2, myLoop
+	blt t0,t5, next1
+	myLoop1:
+	sub t0, t0, t5
+	addi t1, t1, 1
+	bge t0,t5, myLoop1
+	next1:
+	slli t1, t1, 2
 	ldw t3, digit_map(t1)
 	stw t3, SEVEN_SEGS(zero)
 
-	stw zero,t1
+	add t1, zero, zero
 	addi t5,zero,100
-	stw t5,t2
-	bge t0,t2, myLoop
-	ldw t3, digit_map(t1)
-	stw t3, SEVEN_SEGS(4)
-
-	stw zero,t1
-	addi t5,zero,10
-	stw t5,t2
-	bge t0,t2, myLoop
-	ldw t3, digit_map(t1)
-	stw t3, SEVEN_SEGS(8)
-
-	ldw t3, digit_map(t0)
-	stw t3, SEVEN_SEGS(12)
-
-myLoop:
-	addi t0, t0, -t2
+	blt t0,t5, next2
+	myLoop2:
+	sub t0, t0, t5
 	addi t1, t1, 1
-	bge t0,t2, myLoop
+	bge t0,t5, myLoop2
+	next2:
+	slli t1, t1, 2
+	ldw t3, digit_map(t1)
+	stw t3, SEVEN_SEGS+4(zero)
 
+	add t1, zero, zero
+	addi t5,zero,10
+	blt t0,t5, next3
+	myLoop3:
+	sub t0, t0, t5
+	addi t1, t1, 1
+	bge t0,t5, myLoop3
+	next3:
+	slli t1, t1, 2
+	ldw t3, digit_map(t1)
+	stw t3, SEVEN_SEGS+8(zero)
+	
+	slli t0, t0, 2
+	ldw t3, digit_map(t0)
+	stw t3, SEVEN_SEGS+12(zero)
+	ret
 
 ; END: display_score
 
 
 ; BEGIN: init_game
 init_game:
-	addi t0, zero, 1
-	stw t0, HEAD_X(zero)
-	stw t0, HEAD_Y(zero)
-	stw t0, TAIL_X(zero)
-	stw t0, TAIL_Y(zero)
-	
-	ldw t1, SCORE(zero)
-	ldw t2, SEVEN_SEGS(zero)
-	blt t1,t2,yeahLoop
-
-	addi t0, zero, 4
-	stw t0, GSA(zero)
-	call create_food
-	call display_score
-
-yeahLoop:
-	stw zero,t1
-	addi t1,t1,1
-	blt t1,t2,yeahLoop
-
 
 ; END: init_game
 
 
 ; BEGIN: create_food
 create_food:
+	try_again:
   	ldw t1, RANDOM_NUM (zero)
 	addi t0, zero, 255
 	and t1, t1, t0
 	slli t1, t1, 2
 	addi t2, t1, GSA
-	addi t4, zero, SEVEN_SEGS
-	blt t4, t2, return
+	addi t4, zero, SEVEN_SEGS - 4
+	bge t2, t4, try_again
 	ldw t3, 0(t2)
-	bne t3, zero, return
+	bne t3, zero, try_again
 	addi t3, zero, FOOD
 	stw t3, 0(t2)
-	return:
 	ret 
 ; END: create_food
 
@@ -203,14 +208,16 @@ hit_test:
 	ldw t1, HEAD_Y (zero)
 	addi sp, sp, -4
 	stw ra, 0 (sp)
-	call test_orientation
+	call check_next_place
 	ldw ra, 0(sp)
 	addi sp, sp, 4
-
-	bge t0, 12, abordGame
-	ble t0, -1, abordGame
-	bge t1, 8, abordGame
-	ble t1, -1,abordGame
+	
+	addi t7, zero, 12
+	bge t0, t7, abortGame
+	blt t0, zero, abortGame
+	addi t7, zero, 8
+	bge t1, t7, abortGame
+	blt t1, zero,abortGame
 
 	addi t2, zero, 0
 	slli t2, t0, 3
@@ -218,77 +225,59 @@ hit_test:
 	slli t2, t2, 2 ;pos of future head in GSA
 	ldw t3, GSA(t2) ;value of future head in GSA (1 -> 5)
 
-	beq t3, 5, miamMiam
-	beq t3, 1, abordGame
-	beq t3, 2, abordGame
-	beq t3, 3, abordGame
-	beq t3, 4, abordGame
+	addi t7, zero, 1
+	beq t3, t7, abortGame
+	addi t7,t7, 1
+	beq t3, t7, abortGame
+	addi t7,t7, 1
+	beq t3, t7, abortGame
+	addi t7,t7,1
+	beq t3, t7, abortGame
+	addi t7,t7,1	
+	beq t3, t7, miamMiam
 
+	add v0, zero, zero,  ; if no branch were called
+	ret 
 
-	stw v0, 0 ; if no branch were called
-
-abordGame:
-	stw v0, 2
+abortGame:
+	addi v0, zero, 2
 	ret
 
 miamMiam:
-	stw v0, 1
+	addi v0, zero, 1
 	ret
 
 
-test_orientation:
+check_next_place:
 	addi t2, zero, 0
 	slli t2, t0, 3
 	add t2, t2, t1
 	slli t2, t2, 2 ;pos of extremity in GSA
 	ldw t3, GSA(t2) ;direction of extremity
-	beq zero, t5, next
-	stw zero, GSA(t2) ; clear the tail
 
-	next:
 	addi t6,zero,DIR_LEFT
-	beq t6,t3, goleft
+	beq t6,t3, ifleft
 
 	addi t6,zero,DIR_UP
-	beq t6,t3, goup
+	beq t6,t3, ifup
 
 	addi t6,zero, DIR_DOWN
-	beq t6,t3, godown
+	beq t6,t3, ifdown
 
 	addi t6,zero, DIR_RIGHT
-	beq t6,t3, goright
+	beq t6,t3, ifright
 
-goleft:
+ifleft:
 	addi t0,t0,-1
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
 	ret
-goup:
+ifup:
 	addi t1,t1,-1
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
 	ret
-godown:
+ifdown:
 	addi t1,t1,1 
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
 	ret
-goright:
+ifright:
 	addi t0,t0,1
-	addi t2, zero, 0
-	slli t2, t0, 3
-	add t2, t2, t1
-	slli t2, t2, 2
-	stw t6, GSA(t2)
 	ret
 ; END: hit_test
 
@@ -316,39 +305,39 @@ get_input:
 	beq t1, t5, up
 	srli t5, t5, 1	
 	beq t1, t5, left
-
-left:
-	addi t5, zero, DIR_RIGHT
-	addi t0, t0, BUTTON_LEFT
-	beq t3, t5, end
-	addi t3, zero, DIR_LEFT
-	br end
-right:
-	addi t5, zero, DIR_LEFT
-	addi t0, t0, BUTTON_RIGHT
-	beq t3, t5, end
-	addi t3, zero, DIR_RIGHT
-	br end
-up:
-	addi t5, zero, DIR_DOWN
-	addi t0, t0, BUTTON_UP
-	beq t3, t5, end
-	addi t3, zero, DIR_UP
-	br end
-down:
-	addi t5, zero, DIR_UP
-	addi t0, t0, BUTTON_DOWN
-	beq t3, t5, end
-	addi t3, zero, DIR_DOWN
-	br end
-checkpoint:
-	addi t0, t0, BUTTON_CHECKPOINT
-	br end
-end:
-	stw t3, GSA (t2)
-	stw zero, BUTTONS+4 (zero)
-	add v0, zero, t0
-	ret
+	
+	left:
+		addi t5, zero, DIR_RIGHT
+		addi t0, t0, BUTTON_LEFT
+		beq t3, t5, end
+		addi t3, zero, DIR_LEFT
+		br end
+	right:
+		addi t5, zero, DIR_LEFT
+		addi t0, t0, BUTTON_RIGHT
+		beq t3, t5, end
+		addi t3, zero, DIR_RIGHT
+		br end
+	up:
+		addi t5, zero, DIR_DOWN
+		addi t0, t0, BUTTON_UP
+		beq t3, t5, end
+		addi t3, zero, DIR_UP
+		br end
+	down:
+		addi t5, zero, DIR_UP
+		addi t0, t0, BUTTON_DOWN
+		beq t3, t5, end
+		addi t3, zero, DIR_DOWN
+		br end
+	checkpoint:
+		addi t0, t0, BUTTON_CHECKPOINT
+		br end
+	end:
+		stw t3, GSA (t2)
+		stw zero, BUTTONS+4 (zero)
+		add v0, zero, t0
+		ret
 
 ; END: get_input
 
@@ -387,12 +376,15 @@ move_snake:
 	stw t0, HEAD_X(zero)
 	stw t1, HEAD_Y(zero)
 
+	bne a0, zero, food
+
 	addi t5, zero, 1
 	ldw t0, TAIL_X (zero)
 	ldw t1, TAIL_Y (zero)
 	call test_orientation
 	stw t0, TAIL_X(zero)
 	stw t1, TAIL_Y(zero)
+	food:
 	ldw ra, 0(sp)
 	addi sp, sp, 4
 	ret
@@ -421,35 +413,43 @@ test_orientation:
 
 goleft:
 	addi t0,t0,-1
+	bne zero, t5, nl
 	addi t2, zero, 0
 	slli t2, t0, 3
 	add t2, t2, t1
 	slli t2, t2, 2
 	stw t6, GSA(t2)
+	nl:
 	ret
 goup:
 	addi t1,t1,-1
+	bne zero, t5, nu
 	addi t2, zero, 0
 	slli t2, t0, 3
 	add t2, t2, t1
 	slli t2, t2, 2
 	stw t6, GSA(t2)
+	nu:
 	ret
 godown:
 	addi t1,t1,1 
+	bne zero, t5, nd
 	addi t2, zero, 0
 	slli t2, t0, 3
 	add t2, t2, t1
 	slli t2, t2, 2
 	stw t6, GSA(t2)
+	nd:
 	ret
 goright:
 	addi t0,t0,1
+	bne zero, t5, nr
 	addi t2, zero, 0
 	slli t2, t0, 3
 	add t2, t2, t1
 	slli t2, t2, 2
 	stw t6, GSA(t2)
+	nr:
 	ret
 
 ; END: move_snake
@@ -481,21 +481,52 @@ wait:
 blink_score:
 	addi sp, sp, -4
 	stw ra, 0 (sp)
-	add t2, zero, zero
-	addi t3, zero, 3	
+
+	addi sp, sp, -4
+	stw s0, 0(sp)
+	addi sp, sp, -4
+	stw s1, 0(sp)
+	addi sp, sp, -4
+	stw s2, 0(sp)
+	addi sp, sp, -4
+	stw s3, 0(sp)
+
+	add s0, zero, zero
+	addi s1, zero, 3	
 	multiple_loop:
-	add t0, zero, zero
-	addi t1, zero, 4
+	add s2, zero, zero
+	addi s3, zero, 16
 	clear_7_segs:
-		stw zero, SEVEN_SEGS (t0)
-		addi t0, t0, 1
-		bne t0, t1, clear_7_segs
+		stw zero, SEVEN_SEGS (s2)
+		addi s2, s2, 4
+		bne s2, s3, clear_7_segs
 	call wait
 	call display_score
-	addi t2, t2, 1
-	bne t2, t3, multiple_loop
+	addi s0, s0, 1
+	bne s0, s1, multiple_loop
+
+	ldw s3, 0(sp)
+	addi sp, sp, 4
+	ldw s2, 0(sp)
+	addi sp, sp, 4
+	ldw s1, 0(sp)
+	addi sp, sp, 4
+	ldw s0, 0(sp)
+	addi sp, sp, 4
 	ldw ra, 0 (sp)
 	addi sp, sp, 4
 	ret
 
 ; END: blink_score
+
+digit_map:
+	.word 0xFC ; 0
+	.word 0x60 ; 1
+	.word 0xDA ; 2
+	.word 0xF2 ; 3
+	.word 0x66 ; 4
+	.word 0xB6 ; 5
+	.word 0xBE ; 6
+	.word 0xE0 ; 7
+	.word 0xFE ; 8
+	.word 0xF6 ; 9
