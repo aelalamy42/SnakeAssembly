@@ -53,50 +53,59 @@ addi    sp, zero, LEDS
 ; return values
 ;     This procedure should never return.
 main:
-    ; TODO: Finish this procedure.
-;	addi a0, zero, 11
-	;addi a1, zero, 5
-	;call clear_leds	
-	;call set_pixel
-	;jmpi blink_score
+    stw zero, CP_VALID(zero)
 
-;	addi t0, zero, 4
-	;stw t0, GSA+260(zero)
-;	call clear_leds
-;	call create_food
-;	call draw_array
+initGame: 
+  call wait
+  call init_game
 
-;	addi t1, zero, 1234
-;	stw t1, SCORE(zero)
-;	call blink_score
-;	break
+getInput:
+  call wait
+  call get_input
+  addi t0, zero,5
+  beq v0, t0, restore_CP ;if we need to restore checkpoint
+  call hit_test
+  addi t0, zero, 1
+  beq v0, t0, eatenFood ;if food is eaten
+  addi t0, zero, 2
+  beq v0, t0, initGame ;if they have collided
+  add a0, zero, zero	
+  call move_snake
 
-	addi t0, zero, DIR_RIGHT
-	stw t0, GSA (zero)
-	call create_food
-	ml:
-	call draw_array
-	call wait
-	call clear_leds
-	call get_input
-	call hit_test
-	addi t0, zero, 0
-	beq t0, v0, continue
-	addi t0, zero, 1
-	beq t0, v0, f
-	addi t0, zero, 2
-	beq t0, v0, stop
-	f:
-	call create_food
-	addi a0, zero, 1
-	call move_snake
-	br ml
-	continue:
-	add a0, zero, zero
-	call move_snake
-	br ml
-	stop:
-	break
+ledsAndArray:
+  call clear_leds
+  call draw_array
+  br getInput ;if all good 
+
+
+restore_CP:
+  call restore_checkpoint
+  beq v0, zero, getInput
+  br blinkScore
+  
+eatenFood:
+  ldw t0, SCORE(zero)
+  addi t0, t0, 1
+  stw t0, SCORE(zero)
+  call display_score
+  addi a0, zero, 1
+  call move_snake
+  call create_food
+  call save_checkpoint
+  beq v0, zero, ledsAndArray
+
+  blinkScore:
+  call blink_score
+  br ledsAndArray
+
+wait:
+	addi t1, zero, 7808
+	slli t1, t1, 9
+	addi t1, t1, 2304
+	waiting_loop:
+		addi t1, t1, -1
+		bne t1, zero, waiting_loop
+	ret
 
 ; BEGIN: clear_leds
 clear_leds:
@@ -180,7 +189,18 @@ display_score:
 
 ; BEGIN: init_game
 init_game:
+	add t0, zero, zero
+	stw t0, HEAD_X(zero)
+	stw t0, HEAD_Y(zero)
+	stw t0, TAIL_X(zero)
+	stw t0, TAIL_Y(zero)
+	stw t0, SCORE(zero)
 
+	addi t0, zero, DIR_RIGHT
+	stw t0, GSA(zero)
+	call create_food
+	call display_score
+	ret
 ; END: init_game
 
 
@@ -236,7 +256,7 @@ hit_test:
 	addi t7,t7,1	
 	beq t3, t7, miamMiam
 
-	add v0, zero, zero,  ; if no branch were called
+	add v0, zero, zero  ; if no branch were called
 	ret 
 
 abortGame:
@@ -376,7 +396,7 @@ move_snake:
 	stw t0, HEAD_X(zero)
 	stw t1, HEAD_Y(zero)
 
-	bne a0, zero, food
+	bne a0, zero, efood
 
 	addi t5, zero, 1
 	ldw t0, TAIL_X (zero)
@@ -384,7 +404,7 @@ move_snake:
 	call test_orientation
 	stw t0, TAIL_X(zero)
 	stw t1, TAIL_Y(zero)
-	food:
+	efood:
 	ldw ra, 0(sp)
 	addi sp, sp, 4
 	ret
@@ -457,24 +477,58 @@ goright:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
+	stw t0, SCORE (zero)
+	addi t5, zero, 10
+	loopmut10:
+	sub t0, t0, t5
+	addi t1, t1, 1
+	bge t0,t5, loopmut10
+	bne t0, zero, noSave
 
+	addi t1, zero, 1
+	stw t1, CP_VALID (zero)
+	addi t1, zero, HEAD_X
+	addi t3, zero, CP_HEAD_X
+	addi t2, zero, SEVEN_SEGS
+	savel:
+	ldw t0, 0 (t1)
+	stw t0, 0 (t3)
+	addi t1, t1, 4
+	addi t3, t3, 4
+	blt t1, t2, savel
+
+	addi v0, zero, 1
+	ret
+	noSave:
+	add v0, zero, zero
+	ret
 ; END: save_checkpoint
 
 
 ; BEGIN: restore_checkpoint
 restore_checkpoint:
+	ldw t0, CP_VALID (zero)
+	beq t0, zero, noRes
+	addi t1, zero, HEAD_X
+	addi t3, zero, CP_HEAD_X
+	addi t2, zero, SEVEN_SEGS
+	resl:
+	ldw t0, 0 (t3)
+	stw t0, 0 (t1)
+	addi t1, t1, 4
+	addi t3, t3, 4
+	blt t1, t2, resl
+
+	addi v0, zero, 1
+	ret
+	noRes:
+	add v0, zero, zero
+	ret
 
 ; END: restore_checkpoint
 
 ;BEGIN: wait
-wait:
-	addi t1, zero, 7808
-	slli t1, t1, 9
-	addi t1, t1, 2304
-	waiting_loop:
-		addi t1, t1, -1
-		bne t1, zero, waiting_loop
-	ret
+
 ;END: wait
 
 ; BEGIN: blink_score
@@ -500,7 +554,7 @@ blink_score:
 		stw zero, SEVEN_SEGS (s2)
 		addi s2, s2, 4
 		bne s2, s3, clear_7_segs
-	call wait
+	call waitblink
 	call display_score
 	addi s0, s0, 1
 	bne s0, s1, multiple_loop
@@ -515,6 +569,15 @@ blink_score:
 	addi sp, sp, 4
 	ldw ra, 0 (sp)
 	addi sp, sp, 4
+	ret
+
+waitblink:
+	addi t1, zero, 976
+	slli t1, t1, 9
+	addi t1, t1, 7488
+	waiting_blink_loop:
+		addi t1, t1, -1
+		bne t1, zero, waiting_blink_loop
 	ret
 
 ; END: blink_score
