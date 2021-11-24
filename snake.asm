@@ -52,7 +52,6 @@ addi    sp, zero, LEDS
 ;
 ; return values
 ;     This procedure should never return.
-main:
     stw zero, CP_VALID(zero)
 
 initGame: 
@@ -106,8 +105,6 @@ wait:
 		addi t1, t1, -1
 		bne t1, zero, waiting_loop
 	ret
-
-
 ; BEGIN: clear_leds
 clear_leds:
 	addi t1, zero, LEDS
@@ -491,7 +488,7 @@ goright:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
-	stw t0, SCORE (zero)
+	ldw t0, SCORE (zero)
 	addi t5, zero, 10
 	loopmut10:
 	sub t0, t0, t5
