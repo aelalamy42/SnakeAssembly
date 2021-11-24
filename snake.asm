@@ -107,6 +107,7 @@ wait:
 		bne t1, zero, waiting_loop
 	ret
 
+
 ; BEGIN: clear_leds
 clear_leds:
 	addi t1, zero, LEDS
@@ -195,11 +196,24 @@ init_game:
 	stw t0, TAIL_X(zero)
 	stw t0, TAIL_Y(zero)
 	stw t0, SCORE(zero)
-
+	;TODO : clear GSA
+	addi t7, zero, SEVEN_SEGS
+	clear_GSA_loop:
+		stw zero, GSA (t0)
+		addi t0, t0, 4
+		addi t1, t0, GSA
+		blt t1, t7, clear_GSA_loop
+	addi sp, sp, -4
+	stw ra, 0 (sp)
 	addi t0, zero, DIR_RIGHT
 	stw t0, GSA(zero)
 	call create_food
 	call display_score
+	call clear_leds
+	call draw_array
+
+	ldw ra, 0 (sp)
+	addi sp, sp, 4
 	ret
 ; END: init_game
 
@@ -535,7 +549,6 @@ restore_checkpoint:
 blink_score:
 	addi sp, sp, -4
 	stw ra, 0 (sp)
-
 	addi sp, sp, -4
 	stw s0, 0(sp)
 	addi sp, sp, -4
@@ -545,8 +558,8 @@ blink_score:
 	addi sp, sp, -4
 	stw s3, 0(sp)
 
-	add s0, zero, zero
-	addi s1, zero, 3	
+	addi s0, zero, 0
+	addi s1, zero, 3
 	multiple_loop:
 	add s2, zero, zero
 	addi s3, zero, 16
@@ -556,6 +569,7 @@ blink_score:
 		bne s2, s3, clear_7_segs
 	call waitblink
 	call display_score
+	call waitblink
 	addi s0, s0, 1
 	bne s0, s1, multiple_loop
 
@@ -572,9 +586,9 @@ blink_score:
 	ret
 
 waitblink:
-	addi t1, zero, 976
+	addi t1, zero, 1952
 	slli t1, t1, 9
-	addi t1, t1, 7488
+	addi t1, t1, 576
 	waiting_blink_loop:
 		addi t1, t1, -1
 		bne t1, zero, waiting_blink_loop
